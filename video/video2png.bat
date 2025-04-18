@@ -1,0 +1,1 @@
+ffmpeg-win-2.2.2\ffmpeg.exe -i "VIDEO.mp4" -vf fps=10 "00%%04d.png"

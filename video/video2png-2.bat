@@ -1,0 +1,1 @@
+ffmpeg-4.2.1-win64-static\bin\ffmpeg.exe -i VIDEO.mp4 -r 30 %04d.jpg
