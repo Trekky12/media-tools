@@ -8,12 +8,13 @@ import re
 import sys
 import hashlib
 import os
+import piexif
 
 pillow_heif.register_heif_opener()
 
 filesWithoutMetadataFile = []
 
-def get_creation_time(meta_file, file):
+def get_creation_time_from_ente_meta(meta_file, file):
     try:
         with open(meta_file, 'r') as f:
             data = json.load(f)
@@ -41,6 +42,32 @@ def get_creation_time(meta_file, file):
         print(f"Error reading metadata file {meta_file}: {e}")
         return None
 
+def get_creation_time_from_exif(file):
+    try:
+        image = Image.open(file)
+        exif_bytes = image.info.get("exif")
+        if exif_bytes:
+            exif_dict = piexif.load(exif_bytes)
+            date_str = exif_dict["Exif"].get(piexif.ExifIFD.DateTimeOriginal)
+            if date_str:
+                return datetime.strptime(date_str.decode(), '%Y:%m:%d %H:%M:%S')
+
+    except Exception as e:
+        print(f"Failed to read EXIF from {file}: {e}")
+
+    return None
+
+def get_creation_time_from_file(file):
+    try:
+        stat = os.stat(file)
+        if hasattr(stat, 'st_birthtime'):
+            return datetime.fromtimestamp(stat.st_birthtime)
+        else:
+            return datetime.fromtimestamp(stat.st_mtime)
+    except Exception as e:
+        print(f"File time error in {file}: {e}")
+        return datetime.now()
+
 def rename_and_copy_file(src, dst_root, creation_time):
     try:
         new_name = os.path.basename(src)
@@ -51,10 +78,13 @@ def rename_and_copy_file(src, dst_root, creation_time):
             #print(f"File seems to be already renamed: {file_name}")
             pass
         elif creation_time:
-            if isinstance(creation_time, (int, float)):
-              dt = datetime.fromtimestamp(creation_time)
+            if isinstance(creation_time, datetime):
+                dt = creation_time
             else:
-                dt = datetime.fromisoformat(creation_time)
+                if isinstance(creation_time, (int, float)):
+                    dt = datetime.fromtimestamp(creation_time)
+                else:
+                    dt = datetime.fromisoformat(creation_time)
             new_name = dt.strftime(f"%Y-%m-%d %H.%M.%S ({file_name}){file_ext}")
         
         dst_dir = os.path.dirname(src).replace(os.path.dirname(src_root), os.path.dirname(dst_root), 1)
@@ -73,16 +103,50 @@ def rename_and_copy_file(src, dst_root, creation_time):
         print(f"Error renaming or copying file {src}: {e}")
         return None
 
-def convert_heic_to_jpg(heic_path):
-    file_name, file_ext = os.path.splitext(heic_path)
+def apply_gamma(image, gamma=1.1):
+    if image.mode not in ("RGB", "L"):
+        image = image.convert("RGB")
+
+    inv_gamma = 1.0 / gamma
+    table = [int((i / 255.0) ** inv_gamma * 255) for i in range(256)]
+
+    if image.mode == "RGB":
+        return image.point(table * 3)
+    else:
+        return image.point(table)
+
+def convert_heic_to_jpg(heic_path, remove = False):
+    file_name, _ = os.path.splitext(heic_path)
     jpg_path = f"{file_name}_converted.jpg"
     if not os.path.exists(jpg_path):
         try:
             if pillow_heif.is_supported(heic_path):
                 im = Image.open(heic_path)
                 icc_profile = im.info.get('icc_profile')
-                im.save(jpg_path, "JPEG", quality=90, icc_profile=icc_profile)
+
+                # copy exif
+                exif_bytes = im.info.get('exif')
+                if exif_bytes:
+                    try:
+                        exif_dict = piexif.load(exif_bytes)
+                        exif_bytes = piexif.dump(exif_dict)
+                        print(f"Copied EXIF from {heic_path}")
+                    except Exception as e:
+                        print(f"Could not parse EXIF from HEIC: {e}")
+                        exif_bytes = b''
+                else:
+                    exif_bytes = b''
+                    print(f"No EXIF found in {heic_path}")
+
+                # increase gamma
+                im = apply_gamma(im, gamma=1.1)
+
+                im.save(jpg_path, "JPEG", quality=90, icc_profile=icc_profile, exif=exif_bytes)
                 print(f"Converted {heic_path} to {jpg_path}")
+                if remove:
+                    os.remove(heic_path)
+                    print(f"Deleted {heic_path}")
+
         except Exception as e:
             print(f"Error converting {heic_path}: {e}")
     else:
@@ -105,6 +169,9 @@ def process_folder(src_root, dst_root):
             file_name, file_ext = os.path.splitext(file)
             src_file = os.path.join(root, file)
 
+            # =============================================            
+            #       Search for ente metadata folder
+            # =============================================
             meta_suffixes = [
                 # regular case
                 f"{file_ext}", 
@@ -128,14 +195,26 @@ def process_folder(src_root, dst_root):
             for suffix in suffixes:
                 meta_file = os.path.join(root, metafolder, f"{file_name}{suffix}.json")
                 if os.path.isfile(meta_file):
-                    creation_time = get_creation_time(meta_file, file)
+                    creation_time = get_creation_time_from_ente_meta(meta_file, file)
                     if creation_time:
                         break
             else:
                 print(f"{src_file}: No metadata file found.")
 
             if not creation_time:
-                print(f"{src_file}: Invalid or missing creationTime.")
+                print(f"{src_file}: Invalid or missing creationTime from ente metadata")
+            
+                # =============================================            
+                #       use EXIF Date
+                # =============================================        
+                creation_time = get_creation_time_from_exif(src_file)
+                if not creation_time:
+                    print(f"{src_file}: Invalid or missing creationTime from EXIF")
+
+                    # =============================================            
+                    #       use Creation Date
+                    # =============================================        
+                    creation_time = get_creation_time_from_file(src_file)
 
             dst_file = rename_and_copy_file(src_file, dst_root, creation_time)
             if not dst_file:
@@ -199,7 +278,7 @@ def process_deleted(src_root, dst_root):
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print("Usage: python3 renameConvertEnteExport.py <src folder> <dst folder>")
+        print("Usage: python3 renameConvertEnteExport.py <src folder>/ <dst folder>/")
         sys.exit(1)
 
     src_root = sys.argv[1]
