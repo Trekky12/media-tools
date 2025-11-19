@@ -1,0 +1,1 @@
+pyinstaller heic-convert.py --noconsole --clean --onefile --add-data "translations.json;." --add-data "images-regular-full.ico;." -i images-regular-full.ico

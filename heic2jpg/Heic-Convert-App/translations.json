@@ -1,0 +1,40 @@
+{
+    "en": {
+        "select_destination_folder": "Select destination folder",
+        "select_heic_files": "Select HEIC files",
+        "file": "File",
+        "state": "State",
+        "convert": "Convert",
+        "remove_selected_file": "Remove selected file",
+        "delete_originals_title": "Delete Originals?",
+        "delete_originals_content": "Do you want to delete the original files after processing?",
+        "converting": "Converting",
+        "not_supported": "Not supported",
+        "done": "Done",
+        "skipped": "Skipped, File already exists",
+        "ERROR": "ERROR",
+        "convert_failed_title": "Convert Failed",
+        "convert_failed_content": "The conversion has failed!",
+        "convert_complete_title": "Convert Complete",
+        "convert_complete_content": "The conversion has finished successfully!"
+    },
+    "de": {
+        "select_destination_folder": "Zielordner auswählen",
+        "select_heic_files": "HEIC Dateien auswählen",
+        "file": "Datei",
+        "state": "Status",
+        "convert": "Konvertieren",
+        "remove_selected_file": "Ausgewählte Datei entfernen",
+        "delete_originals_title": "Originaldateien löschen?",
+        "delete_originals_content": "Sollen die Originaldateien nach der Konvertierung gelöscht werden?",
+        "converting": "Konvertiere",
+        "not_supported": "Nicht unterstützt",
+        "done": "Fertig",
+        "skipped": "Übersprungen, Datei existiert bereits.",
+        "ERROR": "FEHLER",
+        "convert_failed_title": "Konvertierung fehlgeschlagen",
+        "convert_failed_content": "Die Konvertierung ist fehlgeschlagen!",
+        "convert_complete_title": "Konvertierung abgeschlossen",
+        "convert_complete_content": "Die Konvertierung wurde erfolgreich abgeschlossen!"
+    }
+}
