@@ -1,4 +1,4 @@
-from tkinter import Tk, ttk, filedialog, messagebox, PhotoImage, Button, Frame
+from tkinter import Tk, ttk, filedialog, messagebox, PhotoImage, Button, Frame, TclError
 import threading
 import logging
 import traceback
@@ -14,23 +14,23 @@ import json
 import locale
 
 # Logging
-log_folder = os.path.join(os.getcwd(), "logs")
-if not os.path.exists(log_folder):
-   os.makedirs(log_folder)
+#log_folder = os.path.join(os.getcwd(), "logs")
+#if not os.path.exists(log_folder):
+#   os.makedirs(log_folder)
 
-logger = logging.getLogger("erix")
+logger = logging.getLogger("heic-convert")
 logger.setLevel(logging.DEBUG)
-handler = logging.FileHandler(log_folder + '/heic-convert.log')
-handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
+#handler = logging.FileHandler(log_folder + '/heic-convert.log')
+#handler.setLevel(logging.DEBUG)
+#formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s')
+#handler.setFormatter(formatter)
+#logger.addHandler(handler)
 
 VERSION = "1.0.0"
 
 class HeicConvertApp(Tk):
     def __init__(self):
-        super().__init__(className="HEIC Convert")
+        super().__init__(className="Heic-convert")
         self.title("HEIC Convert - Version: "+ VERSION)
         self.geometry("800x600")
         self.minsize(800, 300)
@@ -87,7 +87,21 @@ class HeicConvertApp(Tk):
         self.convert_button.pack(side="right")
 
     def select_files(self):
-        files = filedialog.askopenfilenames(title=self._("select_heic_files"),filetypes=[("HEIC files",".heic .heif")])
+        # hide hidden folders
+        # https://python-forum.io/thread-31235.html
+        # https://stackoverflow.com/a/54068050
+        try:
+            try:
+                self.tk.call('tk_getOpenFile', '-foobarbaz')
+            except TclError:
+                pass
+        
+            self.tk.call('set', '::tk::dialog::file::showHiddenBtn', '0')
+            self.tk.call('set', '::tk::dialog::file::showHiddenVar', '0')
+        except:
+            pass
+
+        files = filedialog.askopenfilenames(title=self._("select_heic_files"),filetypes=[("HEIC files",".heic .heif .HEIC .HEIF")])
         for file in files:
             self.table.insert("", "end", values=(file, ""))
 
@@ -129,46 +143,42 @@ class HeicConvertApp(Tk):
         self.converting = True
         self.disable_ui()
         logger.info("Starting convert")
+        error = False
+        delete_originals = messagebox.askyesno(self._("delete_originals_title"), self._("delete_originals_content"))
+        
+        pillow_heif.register_heif_opener()
 
-        destination_folder = filedialog.askdirectory(title=self._("select_destination_folder"))
-        if destination_folder:
-            error = False
-            
-            delete_originals = messagebox.askyesno(self._("delete_originals_title"), self._("delete_originals_content"))
-            
-            pillow_heif.register_heif_opener()
+        for item in self.table.get_children():
+            file, *_ = self.table.item(item, "values")
 
-            for item in self.table.get_children():
-                file, *_ = self.table.item(item, "values")
+            self.table.item(item, values=(file, self._("converting")))
 
-                self.table.item(item, values=(file, self._("converting")))
-
-                try:
-                    if not pillow_heif.is_supported(file):
-                        self.table.item(item, values=(file, self._("not_supported")), tags=("warning",))
+            try:
+                if not pillow_heif.is_supported(file):
+                    self.table.item(item, values=(file, self._("not_supported")), tags=("warning",))
+                else:
+                    res = self.convert_heic_to_jpg(file, delete_originals)
+                    if res:
+                        self.table.item(item, values=(file, self._("done")), tags=("ok",))
                     else:
-                        res = self.convert_heic_to_jpg(file, destination_folder, delete_originals)
-                        if res:
-                            self.table.item(item, values=(file, self._("done")), tags=("ok",))
-                        else:
-                            self.table.item(item, values=(file, self._("skipped")), tags=("warning",))
+                        self.table.item(item, values=(file, self._("skipped")), tags=("warning",))
 
-                except Exception as e:
-                    error = True
-                    print(f"Error converting {file}: {e}")
-                    print(traceback.format_exc())
+            except Exception as e:
+                error = True
+                print(f"Error converting {file}: {e}")
+                print(traceback.format_exc())
 
-                    self.table.item(item, values=(file, self._("ERROR")), tags=("error",))
-                    
-                    logger.error(f"Error converting {file}: {e}")
-                    logger.error(traceback.format_exc())
+                self.table.item(item, values=(file, self._("ERROR")), tags=("error",))
+                
+                logger.error(f"Error converting {file}: {e}")
+                logger.error(traceback.format_exc())
 
-            if error:
-                messagebox.showinfo(self._("convert_failed_title"), self._("convert_failed_content"))
-                logger.error("Convert Failed")
-            else:
-                messagebox.showinfo(self._("convert_complete_title"), self._("convert_complete_content"))
-                logger.info("Convert Complete")
+        if error:
+            messagebox.showinfo(self._("convert_failed_title"), self._("convert_failed_content"))
+            logger.error("Convert Failed")
+        else:
+            messagebox.showinfo(self._("convert_complete_title"), self._("convert_complete_content"))
+            logger.info("Convert Complete")
         
         self.enable_ui()
         self.converting = False
@@ -200,11 +210,10 @@ class HeicConvertApp(Tk):
     def _(self, key):
         return self.translations[self.lang].get(key, self.translations["en"].get(key, key))
         
-    def convert_heic_to_jpg(self, heic_file, destination_folder, remove = False):
+    def convert_heic_to_jpg(self, heic_file, remove = False):
         heic_path = Path(heic_file)
         jpg_name = f"{heic_path.stem}_converted.jpg"
-        destination_folder = Path(destination_folder)
-        jpg_path = destination_folder / jpg_name
+        jpg_path = heic_path.parent / jpg_name
         
         if not os.path.exists(jpg_path):
             im = Image.open(heic_path)

@@ -11,7 +11,7 @@ ICON_SRC="$(pwd)/images-regular-full.svg"
 ICON_DIR="$HOME/.local/share/icons"
 ICON_TARGET="$ICON_DIR/$APP_NAME.svg"
 
-DESKTOP_FILE="$HOME/$DESKTOP/$APP_NAME.desktop"
+DESKTOP_FILE="$HOME/.local/share/applications/$APP_NAME.desktop"
 
 mkdir -p "$EXECUTABLE_DIR"
 mkdir -p "$ICON_DIR"
@@ -28,9 +28,12 @@ Exec=$EXECUTABLE_TARGET
 Icon=$ICON_TARGET
 Terminal=false
 Type=Application
-Categories=Utility;
+Categories=Utility
+StartupWMClass=Heic-convert
 EOL
 
 chmod +x "$DESKTOP_FILE"
 
-echo "Desktop shortcut created on your Desktop!"
+cp "$DESKTOP_FILE" "$HOME/$DESKTOP/$APP_NAME.desktop"
+
+echo "Desktop shortcut created"
