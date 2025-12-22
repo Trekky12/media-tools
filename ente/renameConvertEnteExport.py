@@ -224,15 +224,6 @@ def process_folder(src_root, dst_root):
             if pillow_heif.is_supported(dst_file):
                 convert_heic_to_jpg(dst_file)
 
-'''
-def md5(fname):
-    hash_md5 = hashlib.md5()
-    with open(fname, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_md5.update(chunk)
-    return hash_md5.hexdigest()
-'''
-
 def compareTimes(file1, file2):
     mtime1 = os.path.getmtime(file1)
     mtime2 = os.path.getmtime(file2)
@@ -276,6 +267,56 @@ def process_deleted(src_root, dst_root):
                       print("Delete corresponding jpg")
                       os.remove(jpg_path)
 
+def md5(fname):
+    hash_md5 = hashlib.md5()
+    with open(fname, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+def delete_duplicates(root_folder):
+    filename_pattern = re.compile(r"\(([^)]+)\)")
+    suffix_pattern = re.compile(r".+_\d{1}$")
+    seen_hashes = {}
+
+    for root, _, files in os.walk(root_folder):
+        for file in files:
+            filepath = os.path.join(root, file)
+            if not os.path.isfile(filepath):
+                continue
+
+            try:
+                h = md5(filepath)
+            except Exception as e:
+                print(f"Could not hash {filepath}: {e}")
+                continue
+
+            if h not in seen_hashes:
+                seen_hashes[h] = filepath
+                continue
+
+            original = seen_hashes[h]
+
+            match_orig = filename_pattern.search(os.path.basename(original))
+            match_cur = filename_pattern.search(os.path.basename(filepath))
+            orig_name = match_orig.group(1) if match_orig else ""
+            cur_name = match_cur.group(1) if match_cur else ""
+
+            keep_path = original
+            delete_path = filepath
+
+            # Original has suffix, current does not -> keep current, delete first-seen
+            if suffix_pattern.match(orig_name) and not suffix_pattern.match(cur_name):
+                keep_path = filepath
+                delete_path = original
+                seen_hashes[h] = filepath
+
+            print(f"Deleting duplicate {delete_path} (original is {keep_path})")
+            try:
+                os.remove(delete_path)
+            except Exception as e:
+                print(f"Error deleting {delete_path}: {e}")
+
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("Usage: python3 renameConvertEnteExport.py <src folder>/ <dst folder>/")
@@ -288,4 +329,6 @@ if __name__ == "__main__":
     process_deleted(src_root, dst_root)
     print(f"Start Copy & Convert: {datetime.now()}")
     process_folder(src_root, dst_root)
+    print(f"Starting Remove duplicates: {datetime.now()}")
+    delete_duplicates(dst_root)
     print(f"End: {datetime.now()}")
