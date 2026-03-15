@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
 import shutil
+import sys
 
 a = Analysis(
     ['heic-convert.py'],
@@ -39,10 +40,11 @@ exe = EXE(
     icon=['images-regular-full.ico'],
 )
 
-BASE_DIR = os.path.dirname(os.path.abspath(SPEC))
+if sys.platform.startswith("linux"):
+    BASE_DIR = os.path.dirname(os.path.abspath(SPEC))
 
-install_script = os.path.join(BASE_DIR, "install.sh")
-icon = os.path.join(BASE_DIR, "images-regular-full.svg")
+    install_script = os.path.join(BASE_DIR, "install.sh")
+    icon = os.path.join(BASE_DIR, "images-regular-full.svg")
 
-shutil.copy(install_script, DISTPATH)
-shutil.copy(icon, DISTPATH)
+    shutil.copy(install_script, DISTPATH)
+    shutil.copy(icon, DISTPATH)
