@@ -1,0 +1,30 @@
+name: Build HEIC-Convert GUI with Pyinstaller
+
+on:
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: 'test build tags'
+
+jobs:
+  build-win:
+    runs-on: windows-latest
+    steps:
+      - name: Create Windows Executable
+        uses: sayyid5416/pyinstaller@v1
+        with:
+          python_ver: '3.10'
+          spec: 'heic2jpg/Heic-Convert-App/heic-convert.spec'
+          requirements: 'heic2jpg/Heic-Convert-App/requirements.txt'
+          upload_exe_with_name: 'Heic-Convert-App'
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Linux Executable
+        uses: sayyid5416/pyinstaller@v1
+        with:
+          python_ver: '3.10'
+          spec: 'heic2jpg/Heic-Convert-App/heic-convert.spec'
+          requirements: 'heic2jpg/Heic-Convert-App/requirements.txt'
+          upload_exe_with_name: 'Heic-Convert-App'
