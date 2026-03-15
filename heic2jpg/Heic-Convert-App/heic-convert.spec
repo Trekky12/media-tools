@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-
+import os
 import shutil
 
 a = Analysis(
@@ -39,5 +39,10 @@ exe = EXE(
     icon=['images-regular-full.ico'],
 )
 
-shutil.copy("install.sh", DISTPATH)
-shutil.copy("images-regular-full.svg", DISTPATH)
+BASE_DIR = os.path.dirname(os.path.abspath(SPEC))
+
+install_script = os.path.join(BASE_DIR, "install.sh")
+icon = os.path.join(BASE_DIR, "images-regular-full.svg")
+
+shutil.copy(install_script, DISTPATH)
+shutil.copy(icon, DISTPATH)
